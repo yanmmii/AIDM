@@ -2,12 +2,13 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
-#include <ctime>
 #include <algorithm>
 #include <random>
 #include <fstream>
 #include <time.h>
+#include "include/pcg_random.hpp"
 #define MAX_D 200
+#define rand_eng pcg32
 
 enum class AgentState
 {
@@ -40,30 +41,31 @@ public:
     int id;
     std::vector<Agent *> nodes;
 
-public:
-    void contact(Agent *a, Agent *b, double beta, double prob)
+    static Net *create(int id)
     {
-        if ((a->state == AgentState::I && b->state == AgentState::S) ||
-            (b->state == AgentState::I && a->state == AgentState::S))
-        {
-
-            if (prob < beta)
-            {
-                if (a->state == AgentState::S)
-                    a->state = AgentState::E;
-                else
-                    b->state = AgentState::E;
-            }
-        }
+        return new Net{id};
     }
-    void interact(double beta, std::default_random_engine &rng)
+
+private:
+    Net(int id_) : id{id_} {}
+
+public:
+    void contact(double beta, rand_eng &rng)
     {
         for (int i = 0; i < nodes.size(); ++i)
             for (int j = i + 1; j < nodes.size(); ++j)
             {
                 std::uniform_real_distribution<double> probDist(0.0, 1.0);
                 double prob = probDist(rng);
-                contact(nodes[i], nodes[j], beta, prob);
+                bool j2i = nodes[i]->state == AgentState::S && nodes[j]->state == AgentState::I;
+                bool i2j = nodes[j]->state == AgentState::S && nodes[i]->state == AgentState::I;
+                if ((i2j || j2i) && (prob < beta))
+                {
+                    if (j2i)
+                        nodes[i]->state = AgentState::E;
+                    else
+                        nodes[j]->state = AgentState::E;
+                }
             }
     }
 };
@@ -77,27 +79,26 @@ public:
     std::vector<Net *> nets;
 
 public:
-    void disAgnt(std::default_random_engine &rng)
+    void disAgnt(rand_eng &rng)
     {
         std::shuffle(envAgnts.begin(), envAgnts.end(), rng);
 
         for (size_t i = 0; i < envAgnts.size(); i += netsize)
         {
-            Net *n = new Net;
-            n->id = nets.size();
+            Net *net = Net::create((int)nets.size());
             size_t upper = std::min(i + (size_t)netsize, envAgnts.size());
             for (size_t j = i; j < upper; ++j)
             {
-                n->nodes.push_back(envAgnts[j]);
+                net->nodes.push_back(envAgnts[j]);
             }
-            nets.push_back(n);
+            nets.push_back(net);
         }
     }
-    void runEnv(std::default_random_engine &rng, double itv)
+    void runEnv(rand_eng &rng, double itv)
     {
         for (Net *n : nets)
         {
-            n->interact(itv * beta, rng);
+            n->contact(itv * beta, rng);
         }
     }
 };
@@ -116,8 +117,10 @@ public:
     std::vector<Agent *> agnts;
     std::vector<Env> envs;
     std::vector<std::pair<int, double>> itvs;
-    std::default_random_engine rng;
     clock_t runtime;
+
+private:
+    rand_eng rng;
 
 public:
     void addEnv(Env newEnv) { envs.push_back(newEnv); }
@@ -137,28 +140,30 @@ public:
     }
     void run()
     {
+        // adding interventions
+        // itvs.push_back({35, 0.1});
+        // itvs.push_back({60, 1});
+
         clock_t start = clock();
         for (auto &env : envs)
-        {
             env.disAgnt(rng);
-        }
-        for (int d = 1; d <= duration; ++d)
+
+        for (int d = 1; d <= duration; ++d) // main loop
         {
-            double current_effect = 1.0;
-            for (const auto &itv : itvs)
+            double cureff = 1.0;
+            for (auto &itv : itvs)
             {
                 int start_day = std::get<0>(itv);
                 double effect = std::get<1>(itv);
 
                 if (d >= start_day)
-                    current_effect = effect;
+                    cureff = effect;
             }
             for (auto &env : envs)
-            {
-                env.runEnv(rng, current_effect);
-            }
+                env.runEnv(rng, cureff);
             update(d);
         }
+
         runtime = clock() - start;
     }
     void prt()
@@ -229,10 +234,6 @@ public:
 int main()
 {
     Sim sim;
-
-    // interventions:
-    sim.itvs.push_back({35, 0.1});
-    sim.itvs.push_back({60, 1});
 
     Env home, work, schl, pblc;
     home.beta = 0.030, home.netsize = 5;
