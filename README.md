@@ -14,32 +14,30 @@
 
 ## 參數配置
 - **Sim 類別參數**：
-  - population：人口總數（預設 100000 人）。
-  - init_i：    初始感染者數量（預設 10 人）。
-  - duration：  模擬天數（預設 90 天）。
-  - sigma：     潛伏期轉感染的機率（預設 0.22）。
-  - gamma：     感染者康復的機率（預設 0.08）。
+  - `population`：人口總數（預設 100000 人）。
+  - `init_i`：    初始感染者數量（預設 10 人）。
+  - `duration`：  模擬天數（預設 90 天）。
+  - `sigma`：     潛伏期轉感染的機率（預設 0.22）。
+  - `gamma`：     感染者康復的機率（預設 0.08）。
 
 - **Env 環境配置**：
   - 設置傳染參數 beta 和網絡大小 netsize，使用 sim.addEnv() 添加環境：
-  - 
-cpp
+ ```cpp
     Env env;
     env.beta = 0.016, env.netsize = 20;
     sim.addEnv(env);
-
+```
 
 - **干預措施**：
   - 透過 sim.itvs 設定干預策略，例如在第 35 天時降低接觸效應、在第 60 天恢復正常：
-    
-cpp
+```cpp
     sim.itvs.push_back({35, 0.1});
     sim.itvs.push_back({60, 1});
-
+```
     
 ## 輸出結果
 模擬結束後會生成一個名為 result.csv 的文件，其中包含：
-- day：           模擬的第幾天
-- cum_infections：累積感染人數
-- n_infectious：  目前感染人數（不包含潛伏）
-- S, E, I, R：    當天各狀態人數
+- `day`：           模擬的第幾天
+- `cum_infections`：累積感染人數
+- `n_infectious`：  目前感染人數（不包含潛伏）
+- `S, E, I, R`：    當天各狀態人數
